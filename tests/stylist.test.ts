@@ -23,6 +23,16 @@ describe('App-wide hourly AI budget', () => {
 });
 
 describe('Style suggestions', () => {
+  it('logs only a safe error category when the provider rejects a request', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'test-only-key');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 'invalid_api_key', message: 'Invalid key test-only-key sk-secretvalue' } }), { status: 401 })));
+    try {
+      expect(await convexTest(schema, modules).action(api.stylist.suggest, profile)).toMatchObject({ ok: false });
+      expect(warning).toHaveBeenCalledWith('Style provider rejected request', { status: 401, code: 'invalid_api_key', limit: 'unknown' });
+      expect(JSON.stringify(warning.mock.calls)).not.toMatch(/test-only-key|sk-secretvalue/);
+    } finally { warning.mockRestore(); }
+  });
   it('makes no provider call without a key', async () => {
     vi.stubEnv('OPENAI_API_KEY', '');
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
@@ -37,6 +47,7 @@ describe('Style suggestions', () => {
     expect(reply).toEqual({ ok: true, result: suggestions });
     const request = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(request).toMatchObject({ model: 'gpt-6-luna', max_output_tokens: 500, store: false });
+    expect(request.input).toMatch(/json/i);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('shows a plain message for provider errors and still counts the attempt', async () => {
