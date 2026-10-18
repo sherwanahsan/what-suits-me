@@ -1,0 +1,10 @@
+
+.env*
+!.env.example
+node_modules/
+dist/
+.impeccable/
+artifacts/
+*.log
+.agents/
+skills-lock.json
